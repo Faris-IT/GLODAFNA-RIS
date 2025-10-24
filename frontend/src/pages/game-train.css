@@ -1,0 +1,36 @@
+/* src/pages/game-train.css */
+.game-train-page { max-width: 1100px; margin: 18px auto; padding: 8px; font-family: Inter, system-ui, Arial; color: #0b3b2a; }
+.game-header { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:8px 12px; }
+.brand h2 { margin:0; font-size:20px; }
+.brand .desc { margin:0; color:#2d6b52; font-size:13px; }
+.controls { display:flex; gap:12px; align-items:center; }
+.lang-select select { padding:6px 8px; border-radius:6px; }
+.stats { text-align:right; font-weight:600; }
+.buttons { display:flex; gap:8px; align-items:center; }
+.btn { background:#1f5a43; color:white; border:none; padding:8px 12px; border-radius:8px; cursor:pointer; }
+.btn-stop { background:#c94a4a; }
+.btn-reset { background:#888; }
+
+.target-area { display:flex; align-items:center; justify-content:space-between; margin-top:10px; gap:12px; padding:6px 12px; }
+.target-card { background:#fff; border-radius:10px; padding:12px 16px; box-shadow:0 4px 10px rgba(0,0,0,0.06); min-width:240px; }
+.target-card .label { font-size:12px; color:#1f5a43; }
+.target-card .target-word { margin-top:6px; font-size:28px; color:#0b3b2a; font-weight:800; }
+.hint { color:#2f6b53; font-weight:600; }
+
+.track { position:relative; height:260px; margin-top:18px; background:linear-gradient(180deg,#cfe7d8, #bfd9cc); border-radius:12px; overflow:hidden; border: 6px solid rgba(8,46,28,0.08); }
+.card { position:absolute; top:40px; width:180px; height:90px; display:flex; align-items:center; justify-content:center; flex-direction:column; border-radius:12px; background:white; box-shadow:0 6px 18px rgba(0,0,0,0.12); cursor:pointer; user-select:none; padding:10px; }
+.card.hit { box-shadow: 0 0 0 3px rgba(45,170,115,0.18); transform: scale(1.03) !important; }
+.card-text { font-weight:700; color:#124b38; text-align:center; font-size:18px; }
+.card-sub { font-size:12px; color:#567a6a; margin-top:6px; }
+
+.overlay-info { position:absolute; left:0; right:0; top:0; bottom:0; display:flex; align-items:center; justify-content:center; pointer-events:none; color:#1a523f; font-weight:700; font-size:22px; opacity:0.95; }
+.game-over { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); background:rgba(255,255,255,0.95); padding:20px; border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,0.2); text-align:center; }
+.bottom-help { margin-top:12px; text-align:center; color:#255a43; }
+
+/* responsive */
+@media (max-width:900px) {
+  .game-header { flex-direction:column; align-items:flex-start; gap:10px; }
+  .target-area { flex-direction:column; align-items:flex-start; gap:10px; }
+  .track{ height:320px; }
+  .card{ width:150px; height:80px; top:auto; }
+}
