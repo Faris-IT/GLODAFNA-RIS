@@ -19,12 +19,14 @@
 
 html, body, #root {
   height: 100%;
+  width: 100%;
   font-family: 'Poppins', system-ui, Arial, sans-serif;
   color: var(--accent);
   background: var(--gradient);
   background-size: 300% 300%;
   animation: gradientFlow 16s ease infinite;
 }
+
 
 /* Smooth gradient movement */
 @keyframes gradientFlow {
