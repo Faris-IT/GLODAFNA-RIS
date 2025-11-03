@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flow Game</title>
+    <style>
+        body {
+            background-color: #333a45;
+            color: #f0f0f0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+        h1 {
+            font-weight: 300;
+            margin: 0;
+            position: absolute;
+            top: 20px;
+            left: 30px;
+            font-size: 1.5em;
+        }
+        #gameCanvas {
+            background-color: #333a45;
+            border-radius: 8px;
+        }
+        #controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            background-color: #4a5568;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #718096;
+        }
+        #messageBox {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 30px 40px;
+            border-radius: 10px;
+            font-size: 2em;
+            text-align: center;
+            display: none; /* Sembunyi secara default */
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+
+    <h1 id="scoreDisplay">0 / 5</h1>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <div id="controls">
+        <button id="startButton">Mulai</button>
+        <button id="resetButton">Reset</button>
+    </div>
+
+    <div id="messageBox">
+        Level Selesai!
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const startButton = document.getElementById('startButton');
+        const resetButton = document.getElementById('resetButton');
+        const messageBox = document.getElementById('messageBox');
+
+        // --- Konfigurasi Game ---
+
+        const junctionRadius = 20;
+        const dotRadius = 8;
+        const pathWidth = 20;
+        const pathColor = "rgba(100, 100, 100, 0.4)";
+        const junctionColor = "rgba(100, 100, 100, 0.8)";
+        const junctionHighlight = "rgba(255, 255, 255, 0.5)";
+
+        const colors = {
+            red: "#e74c3c",
+            green: "#2ecc71",
+            blue: "#3498db",
+            purple: "#9b59b6",
+            yellow: "#f1c40f",
+            bg: "#333a45"
+        };
+
+        // --- Struktur Data Level ---
+
+        let nodes = {};
+        let segments = {};
+        let junctions = {};
+        let destinations = {};
+        let dots = [];
+        let initialDotsConfig = [];
+        let dotImages = {}; // <-- TAMBAHKAN INI
+
+        let score = 0;
+        let totalDots = 5;
+        let gameRunning = false;
+        let animationFrameId;
+
+        function initLevel() {
+            score = 0;
+            updateScore();
+            gameRunning = false;
+            
+            // Hentikan animasi sebelumnya jika ada
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+            }
+
+            // PANGGIL FUNGSI PRELOAD GAMBAR
+            preloadDotImages(); // <-- TAMBAHKAN INI
+
+            // Definisikan semua node (titik di peta)
+            // Format: id: { x, y }
+            nodes = {
+                'start': { x: 100, y: 350 },
+                'c1': { x: 150, y: 250 },
+                'c2': { x: 200, y: 200 },
+                'c3': { x: 400, y: 350 },
+                'c4': { x: 350, y: 550 },
+                'c5': { x: 550, y: 450 },
+                'c6': { x: 600, y: 150 },
+                'c7': { x: 700, y: 350 },
+                'c8': { x: 750, y: 500 },
+            };
+
+            // Definisikan persimpangan (junctions)
+            // Format: id: { x, y, radius, state, outputs: ['segId1', 'segId2', ...] }
+            junctions = {
+                'j1': { x: 250, y: 350, radius: junctionRadius, state: 0, outputs: ['s_j1_j2', 's_j1_j4'] },
+                'j2': { x: 250, y: 150, radius: junctionRadius, state: 0, outputs: ['s_j2_j3', 's_j2_c2'] },
+                'j3': { x: 450, y: 150, radius: junctionRadius, state: 0, outputs: ['s_j3_d_green', 's_j3_d_red'] },
+                'j4': { x: 350, y: 450, radius: junctionRadius, state: 0, outputs: ['s_j4_d_blue', 's_j4_c3'] },
+                'j5': { x: 650, y: 400, radius: junctionRadius, state: 0, outputs: ['s_j5_d_purple', 's_j5_d_yellow'] },
+            };
+
+            // Definisikan tujuan
+            // Format: id: { x, y, w, h, color }
+            destinations = {
+                'd_green': { x: 650, y: 100, w: 40, h: 40, color: colors.green },
+                'd_red': { x: 400, y: 250, w: 40, h: 40, color: colors.red },
+                'd_purple': { x: 600, y: 300, w: 40, h: 40, color: colors.purple },
+                'd_blue': { x: 400, y: 500, w: 40, h: 40, color: colors.blue },
+                'd_yellow': { x: 600, y: 500, w: 40, h: 40, color: colors.yellow },
+            };
+            
+            // Baris yang error di bawah ini telah dihapus
+
+            // Definisikan segmen (jalur)
+            // Format: id: { fromId, toId, ctrl? }
+            segments = {
+                // Path dari Start
+                's_start_c1': { fromId: 'start', toId: 'c1', ctrl: { x: 100, y: 300 } },
+                's_c1_j1': { fromId: 'c1', toId: 'j1', ctrl: { x: 200, y: 250 } },
+
+                // Opsi dari J1
+                's_j1_j2': { fromId: 'j1', toId: 'j2' },
+                's_j1_j4': { fromId: 'j1', toId: 'j4' },
+
+                // Opsi dari J2
+                's_j2_j3': { fromId: 'j2', toId: 'j3' },
+                's_j2_c2': { fromId: 'j2', toId: 'c2' }, // Path memutar ke J3
+                's_c2_j3': { fromId: 'c2', toId: 'j3', ctrl: { x: 350, y: 200 } },
+
+                // Opsi dari J3
+                's_j3_d_green': { fromId: 'j3', toId: 'c6' },
+                's_c6_d_green': { fromId: 'c6', toId: 'd_green', ctrl: { x: 650, y: 150 } },
+                's_j3_d_red': { fromId: 'j3', toId: 'd_red', ctrl: { x: 450, y: 250 } },
+
+                // Opsi dari J4
+                's_j4_d_blue': { fromId: 'j4', toId: 'c4' },
+                's_c4_d_blue': { fromId: 'c4', toId: 'd_blue', ctrl: { x: 350, y: 500 } },
+                's_j4_c3': { fromId: 'j4', toId: 'c3' }, // Path memutar ke J5
+                's_c3_j5': { fromId: 'c3', toId: 'j5', ctrl: { x: 500, y: 350 } },
+
+                // Opsi dari J5
+                's_j5_d_purple': { fromId: 'j5', toId: 'c7' },
+                's_c7_d_purple': { fromId: 'c7', toId: 'd_purple', ctrl: { x: 600, y: 350 } },
+                's_j5_d_yellow': { fromId: 'j5', toId: 'c8' },
+                's_c8_d_yellow': { fromId: 'c8', toId: 'd_yellow', ctrl: { x: 600, y: 500 } },
+            };
+            
+            // Konfigurasi Dot Awal
+            // Definisi dot yang akan dibuat saat game dimulai
+            initialDotsConfig = [
+                { colorName: 'red', colorHex: colors.red, startSegment: 's_start_c1', delay: 0 },
+                { colorName: 'blue', colorHex: colors.blue, startSegment: 's_start_c1', delay: 2000 },
+                { colorName: 'green', colorHex: colors.green, startSegment: 's_start_c1', delay: 4000 },
+                { colorName: 'purple', colorHex: colors.purple, startSegment: 's_start_c1', delay: 6000 },
+                { colorName: 'yellow', colorHex: colors.yellow, startSegment: 's_start_c1', delay: 8000 },
+            ];
+
+            dots = [];
+            draw(); // Gambar state awal
+        }
+        
+        // --- Logika Pembuatan Dot ---
+        
+        function spawnDots() {
+            let spawnCount = 0;
+            initialDotsConfig.forEach((config, index) => {
+                setTimeout(() => {
+                    dots.push({
+                        id: Date.now() + index,
+                        color: config.colorHex, // Simpan warna hex sbg fallback
+                        image: dotImages[config.colorName], // Simpan gambar yg sudah diload
+                        currentSegmentId: config.startSegment,
+                        progress: 0,
+                        speed: 0.008, // Kecepatan sebagai % per frame
+                        x: 0,
+                        y: 0,
+                        active: true
+                    });
+                }, config.delay);
+            });
+        }
+        
+        // --- FUNGSI BARU UNTUK PRELOAD GAMBAR ---
+        function preloadDotImages() {
+            dotImages = {}; // Reset
+            const size = dotRadius * 2; // Ukuran gambar = diameter dot
+            for (const colorName in colors) {
+                if (colorName === 'bg') continue; // Lewati warna background
+                
+                const colorHex = colors[colorName].substring(1); // Hapus '#'
+                const img = new Image();
+                // Gunakan placehold.co untuk membuat placeholder sesuai warna
+                img.src = `https://placehold.co/${size}x${size}/${colorHex}/${colorHex}.png`;
+                dotImages[colorName] = img;
+            }
+        }
+
+        // --- Logika Game Loop ---
+
+        function update() {
+            if (!gameRunning) return;
+
+            let allDotsDone = true;
+
+            dots.forEach(dot => {
+                if (!dot.active) return;
+
+                allDotsDone = false;
+                
+                const seg = segments[dot.currentSegmentId];
+                if (!seg) {
+                    dot.active = false; // Hentikan dot jika segmen tidak ada
+                    return;
+                }
+
+                // Dapatkan node awal, akhir, dan kontrol
+                const p0 = findNode(seg.fromId);
+                const p1 = findNode(seg.toId);
+                const ctrl = seg.ctrl;
+
+                // Update progres
+                dot.progress = Math.min(1, dot.progress + dot.speed);
+
+                // Hitung posisi baru
+                let pos;
+                if (ctrl) {
+                    pos = getQuadraticBezierXY(dot.progress, p0, ctrl, p1);
+                } else {
+                    pos = getLinearXY(dot.progress, p0, p1);
+                }
+                dot.x = pos.x;
+                dot.y = pos.y;
+
+                // Jika dot mencapai akhir segmen
+                if (dot.progress >= 1) {
+                    dot.progress = 0;
+                    const toId = seg.toId;
+
+                    if (junctions[toId]) {
+                        const j = junctions[toId];
+                        dot.currentSegmentId = j.outputs[j.state];
+                    } else if (destinations[toId]) {
+                        // Sampai di tujuan
+                        dot.active = false;
+                        if (destinations[toId].color === dot.color) {
+                            score++;
+                            updateScore();
+                            // Cek kemenangan
+                            if (score === totalDots) {
+                                gameRunning = false;
+                                showMessage("Level Selesai!");
+                            }
+                        } else {
+                            // Salah tujuan (opsional: tambahkan penalti)
+                        }
+                    } else {
+                        // Pindah ke segmen berikutnya (pass-through node)
+                        // Cari segmen yang dimulai dari node ini
+                        const nextSeg = Object.entries(segments).find(([id, s]) => s.fromId === toId);
+                        if (nextSeg) {
+                            dot.currentSegmentId = nextSeg[0]; // [0] adalah id segmen
+                        } else {
+                            dot.active = false; // Tidak ada jalan keluar
+                        }
+                    }
+                }
+            });
+
+            // Jika semua dot sudah tidak aktif tapi skor belum penuh
+            if (allDotsDone && score < totalDots) {
+                gameRunning = false;
+                // Anda bisa tambahkan pesan "Gagal" di sini
+                // showMessage("Coba Lagi!");
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. Gambar semua segmen (jalur)
+            ctx.strokeStyle = pathColor;
+            ctx.lineWidth = pathWidth;
+            ctx.lineCap = "round";
+            for (const id in segments) {
+                const seg = segments[id];
+                const p0 = findNode(seg.fromId);
+                const p1 = findNode(seg.toId);
+                
+                if(!p0 || !p1) continue; // Pastikan node ada
+
+                ctx.beginPath();
+                ctx.moveTo(p0.x, p0.y);
+                if (seg.ctrl) {
+                    ctx.quadraticCurveTo(seg.ctrl.x, seg.ctrl.y, p1.x, p1.y);
+                } else {
+                    ctx.lineTo(p1.x, p1.y);
+                }
+                ctx.stroke();
+            }
+            
+            ctx.lineWidth = 1; // Reset line width
+
+            // 2. Gambar semua tujuan
+            for (const id in destinations) {
+                const d = destinations[id];
+                ctx.fillStyle = d.color;
+                ctx.fillRect(d.x - d.w / 2, d.y - d.h / 2, d.w, d.h);
+            }
+
+            // 3. Gambar semua persimpangan (junctions)
+            for (const id in junctions) {
+                const j = junctions[id];
+                ctx.fillStyle = junctionColor;
+                ctx.beginPath();
+                ctx.arc(j.x, j.y, j.radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Sorot junction yang aktif (opsional)
+                if (j.isHovered) {
+                     ctx.fillStyle = junctionHighlight;
+                     ctx.beginPath();
+                     ctx.arc(j.x, j.y, j.radius + 3, 0, Math.PI * 2);
+                     ctx.fill();
+                }
+            }
+            
+            // 4. Gambar 'start'
+            ctx.fillStyle = "#111";
+            ctx.beginPath();
+            ctx.roundRect(nodes.start.x - 25, nodes.start.y - 15, 50, 30, 8);
+            ctx.fill();
+
+            // 5. Gambar semua dot
+            dots.forEach(dot => {
+                if (dot.active) {
+                    if (dot.image && dot.image.complete && dot.image.naturalHeight !== 0) {
+                        // Jika gambar sudah dimuat & siap, gambar ke canvas
+                        const w = dot.image.width;
+                        const h = dot.image.height;
+                        // Gambar di tengah posisi x, y
+                        ctx.drawImage(dot.image, dot.x - w / 2, dot.y - h / 2, w, h);
+                    } else {
+                        // Fallback: Jika gambar belum siap, gambar lingkaran
+                        ctx.fillStyle = dot.color;
+                        ctx.beginPath();
+                        ctx.arc(dot.x, dot.y, dotRadius, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            });
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            if (gameRunning) {
+                animationFrameId = requestAnimationFrame(gameLoop);
+            }
+        }
+        
+        // --- Helper Functions ---
+        
+        function findNode(id) {
+            return nodes[id] || junctions[id] || destinations[id] || (nodes.start.id === id ? nodes.start : null) || {x: 100, y: 350}; // 'start' adalah node khusus
+        }
+
+        function getLinearXY(t, p0, p1) {
+            return {
+                x: (1 - t) * p0.x + t * p1.x,
+                y: (1 - t) * p0.y + t * p1.y
+            };
+        }
+
+        function getQuadraticBezierXY(t, p0, p1, p2) {
+            const invT = 1 - t;
+            return {
+                x: invT * invT * p0.x + 2 * invT * t * p1.x + t * t * p2.x,
+                y: invT * invT * p0.y + 2 * invT * t * p1.y + t * t * p2.y
+            };
+        }
+        
+        function updateScore() {
+            scoreDisplay.textContent = `${score} / ${totalDots}`;
+        }
+        
+        function showMessage(text) {
+            messageBox.textContent = text;
+            messageBox.style.display = "block";
+            setTimeout(() => {
+                messageBox.style.display = "none";
+            }, 2000);
+        }
+
+        // --- Event Listeners ---
+
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            for (const id in junctions) {
+                const j = junctions[id];
+                const dist = Math.sqrt((mouseX - j.x) ** 2 + (mouseY - j.y) ** 2);
+                if (dist <= j.radius) {
+                    j.state = (j.state + 1) % j.outputs.length;
+                    if (!gameRunning) draw(); // Redraw jika game belum jalan
+                    break; 
+                }
+            }
+        });
+        
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            
+            let cursorSet = false;
+            for (const id in junctions) {
+                const j = junctions[id];
+                const dist = Math.sqrt((mouseX - j.x) ** 2 + (mouseY - j.y) ** 2);
+                if (dist <= j.radius) {
+                    canvas.style.cursor = 'pointer';
+                    j.isHovered = true;
+                    cursorSet = true;
+                } else {
+                    j.isHovered = false;
+                }
+            }
+            if (!cursorSet) {
+                canvas.style.cursor = 'default';
+            }
+            if (!gameRunning) draw(); // Redraw hover state
+        });
+        
+        startButton.addEventListener('click', () => {
+            if (gameRunning) return;
+            // Jika permainan selesai (skor tercapai), reset dulu
+            if(score === totalDots) {
+                initLevel();
+            }
+            gameRunning = true;
+            spawnDots();
+            gameLoop();
+        });
+        
+        resetButton.addEventListener('click', () => {
+            initLevel();
+            showMessage("Game Direset");
+        });
+
+        // --- Inisialisasi Game ---
+        initLevel();
+
+    </script>
+</body>
+</html>
